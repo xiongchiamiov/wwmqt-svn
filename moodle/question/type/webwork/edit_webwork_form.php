@@ -2,7 +2,7 @@
 /**
  * The editing form code for this question type.
  *
- * @copyright &copy; 2007 Matthew Leventi
+ * @copyright &copy; 2008 Matthew Leventi
  * @author mleventi@gmail.com
  * @license http://www.gnu.org/copyleft/gpl.html GNU Public License
  * @package webwork_qtype
@@ -10,7 +10,7 @@
  
  
 require_once("$CFG->dirroot/question/type/webwork/config.php");
-require_once("$CFG->dirroot/question/type/webwork/lib/locallib.php");
+require_once("$CFG->dirroot/question/type/webwork/lib/question.php");
 require_once("$CFG->dirroot/question/type/webwork/lib/questionfactory.php");
 require_once("$CFG->dirroot/question/type/edit_question_form.php");
 require_once("$CFG->dirroot/backup/lib.php");
@@ -22,7 +22,10 @@ require_once("$CFG->dirroot/backup/lib.php");
  * about the Moodle forms library, which is based on the HTML Quickform PEAR library.
  */
 class question_edit_webwork_form extends question_edit_form {
-    
+ 
+    /**
+    * @desc This function is overriding the normal form definition for a question creation
+    */
     function definition() {
         global $COURSE, $CFG;
 
@@ -32,29 +35,36 @@ class question_edit_webwork_form extends question_edit_form {
         $mform =& $this->_form;
 
         // Standard fields at the start of the form.
+        
+        //General Header
         $mform->addElement('header', 'generalheader', get_string("general", 'form'));
-
+        
+        //Question Category
         $mform->addElement('questioncategory', 'category', get_string('category', 'quiz'), null,
                 array('courseid' => $COURSE->id, 'published' => true, 'only_editable' => true));
-
+                
+        //Question Name
         $mform->addElement('text', 'name', get_string('questionname', 'quiz'),
                 array('size' => 50));
         $mform->setType('name', PARAM_TEXT);
         $mform->addRule('name', null, 'required', null, 'client');
         
+        //Default Grade
         $mform->addElement('text', 'defaultgrade', get_string('defaultgrade', 'quiz'),
                 array('size' => 3));
         $mform->setType('defaultgrade', PARAM_INT);
         $mform->setDefault('defaultgrade', 1);
         $mform->addRule('defaultgrade', null, 'required', null, 'client');
-
+        
+        //Penalty
         $mform->addElement('text', 'penalty', get_string('penaltyfactor', 'quiz'),
                 array('size' => 3));
         $mform->setType('penalty', PARAM_NUMBER);
         $mform->addRule('penalty', null, 'required', null, 'client');
         $mform->setHelpButton('penalty', array('penalty', get_string('penalty', 'quiz'), 'quiz'));
         $mform->setDefault('penalty', 0.1);
-
+        
+        //General Feedback
         $mform->addElement('htmleditor', 'generalfeedback', get_string('generalfeedback', 'quiz'),
                 array('rows' => 10, 'course' => $COURSE->id));
         $mform->setType('generalfeedback', PARAM_RAW);
@@ -86,9 +96,7 @@ class question_edit_webwork_form extends question_edit_form {
         $mform->closeHeaderBefore('buttonar');
     }
     
-    function definition_inner(&$mform) {
-        //FREEZE THE HTML EDITOR
-        //$mform->freeze('questiontext');    
+    function definition_inner(&$mform) {    
         //CODE HEADER
         $mform->addElement('header', 'codeheader', get_string("edit_codeheader", 'qtype_webwork'));
         
@@ -103,16 +111,6 @@ class question_edit_webwork_form extends question_edit_form {
         $mform->setType('code', PARAM_RAW);
         $mform->setHelpButton('code', array('code', get_string('edit_code', 'qtype_webwork'), 'webwork'));
         
-        //FILES HEADER
-        $mform->addElement('header', 'fileheader', get_string("edit_fileheader", 'qtype_webwork'));
-        $mform->setHelpButton('fileheader',array('fileheader', get_string('edit_fileheader','qtype_webwork'),'webwork'));
-
-        //FILES
-        $mform->addElement('html','HTMLIFRAMECONTENT');
-        
-        $mform->addElement('hidden','filepath','HTMLIFRAMEPATH');
-        $mform->setType('filepath',PARAM_PATH);
-                                
         //OPTIONS HEADER
         $mform->addElement('header', 'optionheader', get_string("edit_optionheader","qtype_webwork"));
         
@@ -128,50 +126,29 @@ class question_edit_webwork_form extends question_edit_form {
         $mform->setHelpButton('codecheck', array('codecheck', get_string('edit_codecheck', 'qtype_webwork'), 'webwork'));
         $mform->setDefault('codecheck',WWQUESTION_CODECHECK_ALL);
         
+        //STOREKEY
+        $mform->addElement('hidden', 'storekey');
+        $mform->setType('storekey', PARAM_INT);
+        $mform->setDefault('storekey', WebworkQuestionFactory::MakeNewKey());
+        
     } 
     /**
     * @desc Sets the data in the question object based on old form data. Do some tricks to get file managers to work.
     */
     function set_data($question) {
-        
-        $filepathindex = $this->_form->_elementIndex['filepath'];
         if(isset($this->question->webwork)) {
-            
             $wwquestion = $this->question->webwork;
-            //we found some data we might be updating (load in filemanager)
-            $src = $wwquestion->getFileManagerUrl();
-            $srcpath = $wwquestion->getPath();
             //set fields to old values
             $question->code = $wwquestion->getCodeText();
             $question->codecheck = $wwquestion->getCodeCheck();
-        } else {
-            
-            //new question form (stay consistant with tmp filehandler)
-            if((isset($this->_form->_elements[$filepathindex]->_attributes['value'])) && ($this->_form->_elements[$filepathindex]->_attributes['value'] != '') && ($this->_form->_elements[$filepathindex]->_attributes['value'] != 'HTMLIFRAMEPATH')) {
-                //use the old src path
-                $oldpath = $this->_form->_elements[$filepathindex]->_attributes['value'];
-            } else {
-                //we are on the first form for creating a new question
-                $oldpath = null;
-            }
-            //give me the file handler information (potentially creates a dir)
-            $tempquestion = WebworkQuestionFactory::CreateTemp($oldpath);
-            $src = $tempquestion->getFileManagerUrl();
-            $srcpath = $tempquestion->getPath();
         }
-        
-        //fill in the srcpath
-        $this->_form->_elements[$filepathindex]->_attributes['value'] = $srcpath;
-        
-        //fill in the filehandler
-        $filehandlerindex = $this->_form->_elementIndex[''];
-        $html = "<iframe src='".$src."' width='100%' height='300px' style='border:0px;'></iframe>";
-        $this->_form->_elements[$filehandlerindex]->_text = $html;
         parent::set_data($question);   
     }
     
     /**
     * @desc Validates that the question is without PG errors as mandated by codecheck level.
+    * @param $data array The form data that needs to be validated.
+    * @return array An array of errors indexed by field.
     */
     function validation($data) {
         //init
@@ -194,11 +171,10 @@ class question_edit_webwork_form extends question_edit_form {
                 if(isset($dataobject->id)) {
                     $wwquestion = WebworkQuestionFactory::CreateFormUpdate($dataobject);
                 } else {
-                    $path = $data['filepath'];
-                    $wwquestion = WebworkQuestionFactory::CreateFormNew($dataobject,$path);
+                    $wwquestion = WebworkQuestionFactory::CreateFormNew($dataobject);
                 }
             }
-            WebworkQuestionFactory::Holder($wwquestion->getPath(),$wwquestion);
+            WebworkQuestionFactory::Store($data['storekey'],$wwquestion);
         } catch(Exception $e) {
             $errors['code'] = $e->getMessage();
         }

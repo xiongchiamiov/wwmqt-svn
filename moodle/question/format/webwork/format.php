@@ -13,7 +13,6 @@ define('WWQUESTION_OPTIONS_FILE','OPTIONS.conf');
 define('WWQUESTION_REQUEST_SIZE',1);
 
 require_once("$CFG->libdir/xmlize.php");
-require_once("$CFG->dirroot/question/type/webwork/lib/locallib.php");
 require_once("$CFG->dirroot/question/type/webwork/lib/question.php");
 require_once("$CFG->dirroot/mod/quiz/lib.php");
 require_once("$CFG->dirroot/mod/quiz/editlib.php");
@@ -65,20 +64,23 @@ class qformat_webwork extends qformat_default {
     function readdata($filename) {
         global $CFG;
         set_time_limit(0);
-        echo "Beginning Processing Stage<br>";
-        echo "Extracting '$filename'...<br>";
+        echo "<h2>Processing Stage</h2>";
         flush();
         
+        //EXTRACTION PROCESS
+        echo "Extracting '$filename'...";
+        flush();
         $unique_code = time();
         $temp_dir = $CFG->dataroot."/temp/webworkquiz_import/".$unique_code;
         $this->temp_dir = $temp_dir;
+        
         //failures we cannot handle
         if (!$this->check_and_create_import_dir($unique_code)) {
             error("Could not create temporary directory");
             return;
         }
         if(!is_readable($filename)) {
-            error ("Could not read uploaded file");
+            error("Could not read uploaded file");
             return;
         }
         if (!copy($filename, "$temp_dir/webwork.zip")) {
@@ -90,21 +92,22 @@ class qformat_webwork extends qformat_default {
             error("Could not unzip file.");
             return;   
         }
+        echo "Done<br>";
+        flush();
         
+        //INITIALIZING VARIABLES
+        echo "Initializing Variables...";
+        flush();
         $this->questions = array();
         $this->sets = array();
         $this->tempdirs = array();
         $this->counter = 0;
-        
-        echo "Done<br><br>";
+        echo "Done<br>";
         flush();
+    
         
-        $this->init_options();
         //recurse through categories
         $this->process_category_directory($temp_dir,"Default");
-        
-        echo "Processing Complete<br><br>";
-        flush();
         
         return $this->questions;
     }
@@ -115,7 +118,7 @@ class qformat_webwork extends qformat_default {
     * @return array The questions that passed the codecheck.
     */
     function readquestions($data) {
-        echo "Starting Import Section...<br>";
+        echo "<h2>Import Stage</h2>";
         flush();
         
         $correctdata = array();
@@ -126,6 +129,7 @@ class qformat_webwork extends qformat_default {
         $start = time();
         $count = 1;
         $total = count($this->questions);
+        echo "<h3>Generation</h3>";
         echo "We have $total questions and categories to generate!<br>";
         flush();
         foreach($this->questions as $question) {
@@ -133,24 +137,25 @@ class qformat_webwork extends qformat_default {
                 echo "Question #$count ($question->name) ... ";
                 flush();
                 $qstart = time();
-                $wwquestion = WebworkQuestionFactory::Import($question);
-                $ret = $wwquestion->createDerivations();
-                $qend = time();
-                $qdiff = $qend-$qstart;
-                echo "Generated ~($qdiff secs)<br>";
-                flush();
-                if((!$ret) || (!isset($question->code))) {
-                    $errors[$question->name] = $wwquestion->getErrorMsg();
-                    $wwquestion->removeDir();
-                } else {
-                    WebworkQuestionFactory::Holder($wwquestion->getPath(),$wwquestion);
-                    $question->filepath = $wwquestion->getPath();
+                try {
+                    $wwquestion = WebworkQuestionFactory::Import($question->code,$question->codecheck);
+                    $qend = time();
+                    $qdiff = $qend-$qstart;
+                    echo "Generated ~($qdiff secs)<br>";
+                    $question->webwork = $wwquestion;
+                    $question->questiontext = base64_decode($wwquestion->render(0,array(),0));
+                    $question->questiontextformat = 1;
+                    unset($question->code);
+                    unset($question->codecheck);
+                    unset($question->seed);
                     array_push($correctdata,$question);
+                } catch (Exception $e) {
+                    $errors[$question->name] = $e->getMessage();
                 }
                 $count++;
             } elseif ((isset($question->qtype)) && ($question->qtype == 'category')) {
                 //category addition
-                echo "Category Added $question->category <br>";
+                echo "<h3>Category Added $question->name</h3>";
                 flush();
                 array_push($correctdata,$question);
             } else {
@@ -160,17 +165,20 @@ class qformat_webwork extends qformat_default {
         }
         $end = time();
         $diff = $end - $start;
-        echo "Finished Generation, total time ~($diff secs)<br><br>";
+        echo "<br><b>Finished Generation, total time ~($diff secs)</b><br><br>";
         flush();
+        
         if(count($errors) > 0) {
+            echo "<h3>Errors</h3>";
             echo "<br>Found " . count($errors) . " Question(s) with Errors:<br>";
             foreach($errors as $name => $error) {
                 echo "Name: " . $name . "<br>";
                 echo "Error:" . $error . "<br><br>";
             }
         }
-        echo "Done<br>";
-        echo "Importing " . count($correctdata) . " Questions and Categories...<br>";
+        echo "<h2>Import Stage</h2>";
+        echo "<h3>Questions and Categories</h3>";
+        echo "Importing " . count($correctdata) . " Questions and Categories<br>";
         flush();
         return $correctdata;
     }
@@ -180,18 +188,8 @@ class qformat_webwork extends qformat_default {
     * @return boolean true
     */
     function importpostprocess() {
-        echo "Finished Import of Questions<br>";
-        echo "Starting Import of Definitions<br>";
-        flush();
         $this->insert_set_definitions();
-        echo "Finished Import of Definitions<br>";
-        flush();
-        //need to clean up temporary directories
-        /*fulldelete($this->tempdirs);
-        foreach($this->tempdirs as $tempdir) {
-            fulldelete($tempdir);
-        }*/
-        echo "Complete!<br>";
+        echo "<h1>Complete!</h1>";
         flush();
         return true; 
     }
@@ -202,7 +200,7 @@ class qformat_webwork extends qformat_default {
     * @return string.
     */
     function format_question_text($question) {
-        return $question->name . ' -- Seed: ' . $question->seed . ' -- Trials:' . $question->trials;
+        return $question->name;
     }
     
 //////////////////////////////////////////////////////////////////////////////////
@@ -216,7 +214,7 @@ class qformat_webwork extends qformat_default {
     */
     function process_category_directory($dir,$categoryname) {
         
-        echo "Processing Directory...<br>";
+        echo "<h3>Processing Directory '$categoryname'</h3>";
         flush();
         
         //add trailing slash
@@ -231,7 +229,8 @@ class qformat_webwork extends qformat_default {
         //add this category
         $category = new stdClass;
         $category->qtype = 'category';
-        $category->category = $categoryname;
+        $category->name = trim($categoryname);
+        $category->category['text'][0]['#'] = $category->name;
         $this->questions[] = $category;        
         //data arrays
         $categorydirs = array();
@@ -240,20 +239,19 @@ class qformat_webwork extends qformat_default {
         $questiondirs = array();
         $otherfiles = array();
         
+        echo "---Loaded Files: ";
+        flush();
+        
         //categorize the stuff in this directory into arrays
         $dir_handle = opendir($dir);
         while ($filename = readdir($dir_handle)) {
             if (!in_array($filename, array('.','..','CVS','.svn'))) {
-                
                 $filepath = $dir . $filename;
                 $type = filetype($filepath);
                 
+                //divide the entities in this directory
                 if($type == 'dir') {
-                    if($this->is_question_dir($filename)) {
-                        array_push($questiondirs,$filename);
-                    } else {
-                        array_push($categorydirs,$filename);
-                    }
+                    array_push($categorydirs,$filename);
                 } elseif ($type == 'file') {
                     if ((is_file($filepath)) && (is_readable($filepath))) {
                         if($this->is_problem_file($filename)) {
@@ -265,14 +263,14 @@ class qformat_webwork extends qformat_default {
                 } else {
                     array_push($otherfiles,$filename);
                 }
+                echo ".";
+                flush();
             }
         }
-        
-        echo "---Loaded Files<br>";
+        echo "Done<br>";
         flush();
         
-        //check for options file
-        $optionsfile = $this->process_options($dir);
+        
         
         //deal with the question files
         echo "---Processing Simple Questions: ";
@@ -283,27 +281,7 @@ class qformat_webwork extends qformat_default {
             echo ".";
             flush();
         }
-        echo "<br>---Done Processing Simple Questions<br>";
-        
-        //deal with the question dirs
-        /*echo "---Processing Complex Questions: ";
-        flush();
-        foreach($questiondirs as $questiondir) {
-            $filepath = $dir . $questiondir;
-            //find the requisite file
-            $tempname = substr($questiondir,2) . '.pg';
-            $neededfile = $filepath . '/' . $tempname;
-            if(file_exists($neededfile)) {
-                $codefile = $neededfile;
-                $this->process_question($codefile,$filepath);
-                echo ".";
-                flush();
-            } else {
-                echo "<br>Error: Cannot find the code file:'$neededfile'<br>";
-                flush();                
-            }
-        }
-        echo "<br>---Done Processing Complex Questions<br>";*/
+        echo "Done<br>";
         flush();
         
         //deal with the set definition files
@@ -316,23 +294,14 @@ class qformat_webwork extends qformat_default {
             flush();
             
         }
-        echo "<br>---Done Processing Set Definitions<br>";
+        echo "Done<br>";
         flush();
         
-        echo "Done with Directory<br>";
-        
-        //deal with nested CAT directories
+        //deal with nested directories
         foreach($categorydirs as $categorydir) {
             $categorypath = $dir . $categorydir;
             $this->process_category_directory($categorypath,$categoryname.'/'.$categorydir);
         }
-        
-        $options = array_pop($this->optionstack);
-        if(strstr($dir,$options['DIR']) == false) {
-            echo "Removing Options File<br>";   
-        } else {
-            array_push($this->optionstack,$options);
-        }   
     }
     
     /**
@@ -343,38 +312,13 @@ class qformat_webwork extends qformat_default {
     * @return bool true
     */
     function process_question($codefile,$filepath=NULL) {
-        //load in options (overwrites shallow option files with deeper ones) (inefficient)
         $name = $this->filepath_to_name($codefile);
-        foreach($this->optionstack as $options) {
-            if(isset($options['SEED'])) {
-                $seed = $options['SEED'];
-            }
-            if(isset($options['TRIALS'])) {
-                $trials = $options['TRIALS'];
-            }
-            if(isset($options['CODECHECK'])) {
-                $codecheck = $options['CODECHECK'];
-            }
-            if(isset($options['SEED'])) {
-                $seed = $options['SEED'];
-            }
-            if(isset($options['NAME'])) {
-                $name = $options['NAME'];
-            }
-            if(isset($options['CACHE'])) {
-                $cache = $options['CACHE'];
-            }
-        }
         $question = $this->defaultquestion();
         $question->name = $this->strip_file_extension($name);
         $question->qtype = 'webwork';
         $question->code = base64_encode((file_get_contents($codefile)));
-        $question->codecheck = $codecheck;
-        $question->seed = $seed;
-        $question->trials = $trials;
+        $question->codecheck = 1;
         $question->grading = 0;
-        $question->cache = $cache;
-        $question->filepath = $filepath;
         //create the question object
         $this->questions[] = $question;
         return true;
@@ -446,36 +390,6 @@ class qformat_webwork extends qformat_default {
         return true;
         
     }
-    
-    /**
-    * @desc Checks if an options file exists in the current directory and processes it.
-    * @param string $dir The directory to check in.
-    * @return bool (true if optionsfile exists otherwise false)
-    */
-    function process_options($dir) {
-        $possiblefile = $dir  .'/' . WWQUESTION_OPTIONS_FILE;
-        if(!file_exists($possiblefile)) {
-            return false;
-        }
-        
-        $contents = file_get_contents($possiblefile);
-        $lines = explode("\n",$contents);
-        $options = array();
-        foreach($lines as $line) {
-            $templine = trim($line);
-            $parts = explode("=",$templine);
-            if(count($parts) == 2) {
-                $firstpart = trim($parts[0]);
-                $secondpart = trim($parts[1]);
-                $options[$firstpart] = $secondpart;
-            }
-        }
-        $options['DIR'] = $dir;
-        array_push($this->optionstack,$options);
-        echo "---Applying Custom Options<br>";
-        flush();
-        return true;
-    }
 
 //////////////////////////////////////////////////////////////////////////////////
 //IMPORTER INSERT FUNCTIONS (arrays --> DB or moodledata)
@@ -487,6 +401,7 @@ class qformat_webwork extends qformat_default {
     */
     function insert_set_definitions() {
         global $COURSE;
+        echo "<h3>Set Definitions</h3>";
         //find out the quiz module num
         $this->quizmodnum = get_field('modules','id','name','quiz');
         if($this->quizmodnum == false) {
@@ -694,33 +609,6 @@ class qformat_webwork extends qformat_default {
         }
         return $status;
     }
-    
-    /**
-    * @desc Creates the initial options for questions.
-    * @return bool true
-    */
-    function init_options() {
-        echo "Initializing Options<br>";
-        
-        $options = array();
-        $options['SEED'] = 0;
-        $options['TRIALS'] = 0;
-        $options['CODECHECK'] = 4;
-        $options['CACHE'] = 0;
-        $options['DIR'] = '/';
-        
-        echo "---Default Cache: " . $options['CACHE'] ." <br>";
-        echo "---Default Seed: " . $options['SEED'] . " <br>";
-        echo "---Default Trials: " . $options['TRIALS'] ." <br>";
-        echo "---Default Codecheck: " . $options['CODECHECK'] . " <br>";
-        
-        $this->optionstack = array();
-        array_push($this->optionstack,$options);
-        
-        echo "Done<br><br>";
-        flush();
-        return true;
-    }
        
     /**
     * @desc Takes a full filepath and returns a name by striping the file extension and all characters before the last '/'
@@ -756,19 +644,6 @@ class qformat_webwork extends qformat_default {
     function is_problem_file($filename) {
         $len = strlen($filename);
         if(($len > 3) && ($filename[$len-1] == 'g') && ($filename[$len-2] == 'p') && ($filename[$len-3] == '.')) {
-            return true;
-        }
-        return false;
-    }
-    
-    /**
-    * @desc Determines if a directory starts with Q_
-    * @param string $dirname The directory.
-    * @return bool
-    */
-    function is_question_dir($dirname) {
-        $len = strlen($dirname);
-        if(($len > 2) && ($dirname[0] == 'Q') && ($dirname[1] == '_')) {
             return true;
         }
         return false;

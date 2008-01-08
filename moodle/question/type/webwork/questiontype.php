@@ -2,7 +2,7 @@
 /**
  * The question type class for the webwork question type.
  *
- * @copyright &copy; 2007 Matthew Leventi
+ * @copyright &copy; 2008 Matthew Leventi
  * @author mleventi@gmail.com
  * @license http://www.gnu.org/copyleft/gpl.html GNU Public License
  * @package webwork_qtype
@@ -10,6 +10,7 @@
 
 
 require_once("$CFG->dirroot/question/type/webwork/config.php");
+require_once("$CFG->dirroot/question/type/webwork/lib/question.php");
 require_once("$CFG->dirroot/question/type/webwork/lib/questionfactory.php");
 
 require_once("$CFG->dirroot/question/type/questiontype.php");
@@ -71,18 +72,20 @@ class webwork_qtype extends default_questiontype {
     */
     function save_question($question, $form, $course) {
         //check if we have a filepath key
-        if(isset($form->filepath)) {
-            $path = $form->filepath;
-        } elseif(isset($question->filepath)) {
-            $path = $question->filepath;
+        if(isset($form->storekey)) {
+            $key = $form->storekey;
+        } elseif(isset($question->storekey)) {
+            $key = $question->storekey;
         } else {
             print_error('error_no_filepath','qtype_webwork');
             return false;
         }
         //check if we have a record
         try {
-            $wwquestion = WebworkQuestionFactory::Holder($path);
+            $wwquestion = WebworkQuestionFactory::Retrieve($key);
+            $form->webwork = $wwquestion;
             $form->questiontext = base64_decode($wwquestion->render(0,array(),0));
+            $form->questiontextformat = 1;
         } catch(Exception $e) {
             print_error('error_no_filepath_record','qtype_webwork');
         }
@@ -102,16 +105,7 @@ class webwork_qtype extends default_questiontype {
             print_error('error_question_id','qtype_webwork');
             return false;
         }
-        if(!isset($question->filepath)) {
-            print_error('error_no_filepath','qtype_webwork');
-            return false;
-        }
-        //attempt retrieval of the record for filepath key
-        try {
-            $wwquestion = WebworkQuestionFactory::Holder($question->filepath);
-        } catch(Exception $e) {
-            print_error('error_no_filepath_record','qtype_webwork');
-        }
+        $wwquestion = $question->webwork;
         //set the parent question
         $wwquestion->setParent($question->id);
         //save
@@ -336,50 +330,6 @@ class webwork_qtype extends default_questiontype {
     }
     
     /**
-    * Changes all states for the given attempts over to a new question
-    *
-    * This is used by the versioning code if the teacher requests that a question
-    * gets replaced by the new version. In order for the attempts to be regraded
-    * properly all data in the states referring to the old question need to be
-    * changed to refer to the new version instead. In particular for question types
-    * that use the answers table the answers belonging to the old question have to
-    * be changed to those belonging to the new version.
-    *
-    * @param integer $oldquestionid  The id of the old question
-    * @param object $newquestion    The new question
-    * @param array  $attempts       An array of all attempt objects in whose states
-    *                               replacement should take place
-    */
-    function replace_question_in_attempts($oldquestionid, $newquestion, $attempts) {
-        echo 'Not yet implemented';
-        return;
-    }
-        
-       
-    
-    /**
-    * Renders the question for printing and returns the LaTeX source produced
-    *
-    * This function should render the question suitable for a printed problem
-    * or solution sheet in LaTeX and return the rendered output.
-    * @return string          The LaTeX output.
-    * @param object $question The question to be rendered. Question type
-    *                         specific information is included.
-    * @param object $state    The state to render the question in. The
-    *                         question type specific information is also
-    *                         included.
-    * @param object $cmoptions
-    * @param string $type     Indicates if the question or the solution is to be
-    *                         rendered with the values 'question' and
-    *                         'solution'.
-    */
-    function get_texsource(&$question, &$state, $cmoptions, $type) {
-        // The default implementation simply returns a string stating that
-        // the question is only available online.
-        return get_string('onlineonly', 'texsheet');
-    }
-    
-    /**
      * Backup the data in the question
      *
      * This is used in question/backuplib.php
@@ -391,31 +341,14 @@ class webwork_qtype extends default_questiontype {
         $webworks = get_records('question_webwork', 'question', $question, 'id');
         //If there are webworks
         if ($webworks) {
-            //Print webworks header
             //Iterate over each webwork
             foreach ($webworks as $webwork) {
-                
-                $status = fwrite ($bf,start_tag("WEBWORK",$level,true));
-                
+                $status = fwrite($bf,start_tag("WEBWORK",$level,true));
+                fwrite ($bf,full_tag("CODECHECK",$level+1,false,$webwork->codecheck));
                 fwrite ($bf,full_tag("CODE",$level+1,false,$webwork->code));
-                fwrite ($bf,full_tag("SEED",$level+1,false,$webwork->seed));
-                fwrite ($bf,full_tag("TRIALS",$level+1,false,$webwork->trials));
-                
-                $webworksderived = get_records('question_webwork_derived','question_webwork',$webwork->id);
-                if($webworksderived) {
-                    $status = fwrite ($bf,start_tag("WEBWORKDERIVED",$level+1,true));
-                    foreach ($webworksderived as $webworkderived) {
-                        fwrite ($bf,full_tag("ID",$level+2,false,$webworkderived->id));
-                        fwrite ($bf,full_tag("QUESTION_WEBWORK",$level+2,false,$webworkderived->question_webwork));
-                        fwrite ($bf,full_tag("HTML",$level+2,false,$webworkderived->html));
-                        fwrite ($bf,full_tag("SEED",$level+2,false,$webworkderived->seed));
-                    }
-                    $status = fwrite ($bf,end_tag("WEBWORKDERIVED",$level+1,true));
-                }
+                fwrite ($bf,full_tag("GRADING",$level+1,false,$webwork->grading));
                 $status = fwrite ($bf,end_tag("WEBWORK",$level,true));
             }
-            //Print webworks footer
-            //Now print question_webwork
             $status = question_backup_answers($bf,$preferences,$question);
         }
         return $status;
@@ -440,27 +373,12 @@ class webwork_qtype extends default_questiontype {
             //Now, build the question_webwork record structure
             $webwork = new stdClass;
             $webwork->question = $new_question_id;
+            $webwork->codecheck = backup_todb($webwork_info['#']['CODECHECK']['0']['#']);
             $webwork->code = backup_todb($webwork_info['#']['CODE']['0']['#']);
-            $webwork->seed = backup_todb($webwork_info['#']['SEED']['0']['#']);
-            $webwork->trials = backup_todb($webwork_info['#']['TRIALS']['0']['#']);
+            $webwork->grading = backup_todb($webwork_info['#']['GRADING']['0']['#']);
 
             //The structure is equal to the db, so insert the question_shortanswer
             $newid = insert_record("question_webwork",$webwork);
-            
-            $webworksderived = $webwork_info['#']['WEBWORKDERIVED'];
-            for($j=0; $j < sizeof($webworksderived); $j++) {
-                $webworkderived_info = $webworksderived[$j];
-                
-                $webworkderived = new stdClass;
-                $webworkderived->question_webwork = $newid;
-                $webworkderived->html = backup_todb($webworkderived_info['#']['HTML']['0']['#']);
-                $webworkderived->seed = backup_todb($webworkderived_info['#']['SEED']['0']['#']);
-                
-                $newidderived = insert_record("question_webwork_derived",$webworkderived);
-                if (!$newidderived) {
-                    $status = false;
-                }
-            }
 
             //Do some output
             if (($i+1) % 50 == 0) {
@@ -484,3 +402,4 @@ class webwork_qtype extends default_questiontype {
 // Register this question type with the system.
 question_register_questiontype(new webwork_qtype());
 ?>
+

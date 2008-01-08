@@ -2,7 +2,7 @@
 /**
  * The WebworkQuestionFactory Class.
  * 
- * @copyright &copy; 2007 Matthew Leventi
+ * @copyright &copy; 2008 Matthew Leventi
  * @author mleventi@gmail.com
  * @license http://www.gnu.org/copyleft/gpl.html GNU Public License
  * @package webwork_qtype
