@@ -84,8 +84,8 @@ class webwork_qtype extends default_questiontype {
         try {
             $wwquestion = WebworkQuestionFactory::Retrieve($key);
             $form->webwork = $wwquestion;
-            $form->questiontext = base64_decode($wwquestion->render(0,array(),0));
-            $form->questiontextformat = 1;
+            $form->questiontext = addslashes(base64_decode($wwquestion->render(0,array(),0)));
+            $form->questiontextformat = FORMAT_MOODLE;
         } catch(Exception $e) {
             print_error('error_no_filepath_record','qtype_webwork');
         }

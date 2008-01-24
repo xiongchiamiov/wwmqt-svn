@@ -49,30 +49,36 @@ sub promptUser {
       return $_;
    }
 }
-
-print "###################################\n";
-print "#WeBWorK Question Type in Moodle  #\n";
-print "###################################\n";
+print "##########################################\n";
+print "#WeBWorK Moodle Question Type (WWMQT)    #\n";
+print "##########################################\n";
 
 #Continue?
-print "This script will setup the configuration of WeBWorK Question Server.\n";
+print "This script will setup the WWMQT.\n";
 $continue = promptUser('Continue','y');
 if($continue ne "y") {
     exit;
 }
+print "\n";
 
 #Program Root
-print "Please enter the root directory where wwquestion module is located. \n";
-print "Example: /tmp/wwmoodle/wwquestion\n";
-$wwquestionRoot = promptUser('');
+my $path = $0;
+$path =~ s|[^/]*$||;
+$path = Cwd::abs_path($path);
+$path = $path .  '/../../';
+$path = Cwd::abs_path($path);
+print "Enter the root directory where the WWMQT module is located. \n";
+print "Examples: '/tmp/wwmqt' , '/home/you/tmp/wwmqt'\n";
+$wwquestionRoot = promptUser('',$path);
+print "\n";
 
 #Moodle Root
-print "Please enter the root directory where Moodle is installed. \n";
-print "Example: /var/www/moodle \n";
+print "Enter the root directory where Moodle is installed. \n";
+print "Example: '/var/www/moodle' \n";
 $moodleRoot = promptUser('');
 
 #WSDL Root Directory
-print "Please enter the WSDL Path given in the server setup. \n";
+print "Enter the WSDL Path given in the WWQS setup. \n";
 print "Example: http://myserver/problemserver_files/WSDL.wsdl\n";
 $wsdlPath = promptUser('');
 
@@ -97,20 +103,13 @@ print "config.php file generated.\n";
 #File Moving/Linking
 $files = promptUser('Would you like me to place the files into proper directories (y,n)','y');
 if($files eq 'y') {
-   $doWhat = promptUser('Would you like me to copy the help files or soft link them.(copy,link)','link');
-   if($doWhat eq 'link') {
-      $action = 'ln -sf ';
-   } elsif ($doWhat eq 'copy') {
-      print "Remember to rerun setup when/if you update from the CVS\n";
-      $action = 'cp -R ';
-   } else {
-      exit;
-   }
+   $action = 'cp -R ';
    #wipe existing directories
    system("rm -rf $moodleRoot/question/type/webwork");
    system("rm -rf $moodleRoot/blocks/webwork_printer");
    system("rm -rf $moodleRoot/question/format/webwork");
    system("rm -rf $moodleRoot/lang/en_utf8/help/webwork");
+   #new ones
    system("cp -R $wwquestionRoot/moodle/question/type/webwork " .$moodleRoot . '/question/type/');
    system("cp -R $wwquestionRoot/moodle/blocks/webwork_printer " .$moodleRoot . '/blocks/');
    system("cp -R $wwquestionRoot/moodle/question/format/webwork " .$moodleRoot . '/question/format/');
@@ -118,10 +117,8 @@ if($files eq 'y') {
    system($action . "$wwquestionRoot/moodle/lang/en_utf8/qtype_webwork.php " . $moodleRoot . '/lang/en_utf8/qtype_webwork.php');
    system($action . "$wwquestionRoot/moodle/lang/en_utf8/help/quiz/webwork.html " . $moodleRoot . '/lang/en_utf8/help/quiz/webwork.html');
    system($action . "$wwquestionRoot/moodle/lang/en_utf8/help/webwork " . $moodleRoot . '/lang/en_utf8/help/');
-
-   print "Setup Successful!\n";
-
-
 }
+
+print "Setup Successful!\n";
 
 1;

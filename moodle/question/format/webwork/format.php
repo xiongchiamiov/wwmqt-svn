@@ -118,12 +118,15 @@ class qformat_webwork extends qformat_default {
     * @return array The questions that passed the codecheck.
     */
     function readquestions($data) {
+        global $COURSE;
+        $courseid = $COURSE->id;
         echo "<h2>Import Stage</h2>";
         flush();
         
         $correctdata = array();
         $errors = array();
         
+        $currentcategoryid = null;
         //this is where we load question requests
         
         $start = time();
@@ -139,6 +142,18 @@ class qformat_webwork extends qformat_default {
                 $qstart = time();
                 try {
                     $wwquestion = WebworkQuestionFactory::Import($question->code,$question->codecheck);
+                    if(isset($currentcategoryid)) {
+                        $previousid = get_field('question','id','category',$currentcategoryid,'name',$question->name);
+                        if($previousid) {
+                            $previouscode = get_field('question_webwork','code','question',$previousid);
+                            if($previouscode == $question->code) {
+                                echo "Detected Duplicate<br>";
+                                throw new Exception('Ignoring: Question already exists.');
+                            } else {
+                                set_field('question','name',$question->name . '_old','id',$previousid);
+                            }
+                        }
+                    }
                     $qend = time();
                     $qdiff = $qend-$qstart;
                     echo "Generated ~($qdiff secs)<br>";
@@ -157,6 +172,18 @@ class qformat_webwork extends qformat_default {
                 //category addition
                 echo "<h3>Category Added $question->name</h3>";
                 flush();
+                $catarray = explode('/',$question->name);
+                $parentid = null;
+                
+                foreach($catarray as $catname) {
+                    if(!isset($parentid)) {
+                        $parentid = get_field('question_categories','id','name',$catname,'course',$courseid);
+                    } else {
+                        $parentid = get_field('question_categories','id','name',$catname,'course',$courseid,'parent',$parentid);
+                    }
+                }
+                $currentcategoryid = $parentid;
+                var_dump($currentcategoryid);             
                 array_push($correctdata,$question);
             } else {
                 echo "Unused File<br>";
@@ -467,8 +494,13 @@ class qformat_webwork extends qformat_default {
         $quiz->generalfeedbackopen = 1;
         $quiz->generalfeedbackclosed = 1;
         $quiz->questionsperpage = 1;
-        $quiz->grade = 10; 
-        
+        $quiz->grade = 10;
+        //duplicate check
+        $dup = get_field('quiz','id','course',$quiz->course,'name',$quiz->name);
+        if($dup) {
+            echo "Already found a quiz $quiz->name. <br>";
+            return false;
+        }
         
         $result = quiz_add_instance($quiz);
         if($result == false) {
@@ -661,15 +693,5 @@ class qformat_webwork extends qformat_default {
         }
         return false;
     }
-    
-    
-        
-    
-    
-
-    
-    
-    
-    
 }
 ?>
