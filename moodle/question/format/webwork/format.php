@@ -158,7 +158,7 @@ class qformat_webwork extends qformat_default {
                     $qdiff = $qend-$qstart;
                     echo "Generated ~($qdiff secs)<br>";
                     $question->webwork = $wwquestion;
-                    $question->questiontext = base64_decode($wwquestion->render(0,array(),0));
+                    $question->questiontext = addslashes(base64_decode($wwquestion->render(0,array(),0)));
                     $question->questiontextformat = 1;
                     unset($question->code);
                     unset($question->codecheck);
