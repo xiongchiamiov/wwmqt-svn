@@ -173,7 +173,8 @@ class qformat_webwork extends qformat_default {
                 //category addition
                 echo "<h3>Category Added $question->name</h3>";
                 flush();
-                //$question->category = $question->name;
+                //var_dump($question);
+                $question->category = $question->name;
                 $catarray = explode('/',$question->name);
                 $parentid = null;
                 
