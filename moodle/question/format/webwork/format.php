@@ -135,7 +135,8 @@ class qformat_webwork extends qformat_default {
         echo "<h3>Generation</h3>";
         echo "We have $total questions and categories to generate!<br>";
         flush();
-        foreach($this->questions as $question) {
+        for($i=0;$i<count($this->questions);$i++) {
+            $question = $this->questions[$i];
             if(isset($question->qtype) && ($question->qtype == 'webwork')) {
                 echo "Question #$count ($question->name) ... ";
                 flush();
@@ -172,6 +173,7 @@ class qformat_webwork extends qformat_default {
                 //category addition
                 echo "<h3>Category Added $question->name</h3>";
                 flush();
+                //$question->category = $question->name;
                 $catarray = explode('/',$question->name);
                 $parentid = null;
                 
@@ -182,8 +184,7 @@ class qformat_webwork extends qformat_default {
                         $parentid = get_field('question_categories','id','name',$catname,'course',$courseid,'parent',$parentid);
                     }
                 }
-                $currentcategoryid = $parentid;
-                var_dump($currentcategoryid);             
+                $currentcategoryid = $parentid;             
                 array_push($correctdata,$question);
             } else {
                 echo "Unused File<br>";
@@ -272,7 +273,7 @@ class qformat_webwork extends qformat_default {
         //categorize the stuff in this directory into arrays
         $dir_handle = opendir($dir);
         while ($filename = readdir($dir_handle)) {
-            if (!in_array($filename, array('.','..','CVS','.svn'))) {
+            if (!in_array($filename, array('.','..','CVS','.svn','__MACOSX','.DS_STORE'))) {
                 $filepath = $dir . $filename;
                 $type = filetype($filepath);
                 
