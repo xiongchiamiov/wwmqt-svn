@@ -118,6 +118,8 @@ class WebworkQuestion {
         $questionhtml = "";
         $parser = new HtmlParser($this->_derivation->html);
         $currentselect = "";
+        
+        $checkboxes = array();
         while($parser->parse()) {
             //change some attributes of html tags for moodle compliance
             if ($parser->iNodeType == NODE_TYPE_ELEMENT) {
@@ -144,9 +146,17 @@ class WebworkQuestion {
                 }
                 //handle specific change
                 if($nodename == "INPUT") {
-                    //put submitted value into field
-                    if(isset($answers[$name])) {
-                        $parser->iNodeAttributes['value'] = $answers[$name]->answer;
+                    $nodetype = strtoupper($parser->iNodeAttributes['type']);
+                    if($nodetype == "CHECKBOX") {
+                        if(strstr($answers[$name]->answer,$parser->iNodeAttributes['value'])) {
+                            $parser->iNodeAttributes['checked'] = '1';
+                        }
+                        $parser->iNodeAttributes['name'] = $parser->iNodeAttributes['name'] . '_' . $parser->iNodeAttributes['value'];                      
+                    } else {
+                        //put submitted value into field
+                        if(isset($answers[$name])) {
+                            $parser->iNodeAttributes['value'] = $answers[$name]->answer;
+                        }
                     }
                 } else if($nodename == "SELECT") {
                     $currentselect = $name;    
@@ -183,6 +193,30 @@ class WebworkQuestion {
                 }
             }
         }
+        
+        //combine results from the answer array for checkboxes
+        $checkanswers = array();
+        $tempanswers = array();
+        for($i=0;$i<count($answers);$i++) {
+            $fieldname = $answers[$i]['field'];
+            $pos = strpos($fieldname,'_');
+            if($pos !== FALSE) {
+                $fieldname = substr($fieldname,0,$pos);
+                if(isset($checkanswers[$fieldname])) {
+                    $checkanswers[$fieldname] .= $answers[$i]['answer'];
+                } else {
+                    $checkanswers[$fieldname] = $answers[$i]['answer'];
+                }              
+            } else {
+                array_push($tempanswers,$answers[$i]);
+            }
+        }
+        foreach($checkanswers as $key => $value) {
+            array_push($tempanswers,array('field' => $key,'answer' => $value));
+        }
+        $answers = $tempanswers;
+        
+        
         
         $client = WebworkClient::Get();
         $env = WebworkQuestion::DefaultEnvironment();
