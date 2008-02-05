@@ -295,6 +295,20 @@ class webwork_qtype extends default_questiontype {
         return $ret;
     }
     
+    function print_question_submit_buttons(&$question, &$state, $cmoptions, $options) {
+        global $COURSE;
+        $seed = $state->responses['seed'];
+        echo "<table><tr><td>";
+        parent::print_question_submit_buttons($question,$state,$cmoptions,$options);
+        echo "</td><td>";
+        if((!$options->readonly) && ($COURSE->id != 1)) {
+            echo link_to_popup_window('/question/type/webwork/emailinstructor.php?id=' . $question->id.'&amp;seed='.$seed.'&amp;courseid='.$COURSE->id, 'emailinstructor',
+                "<input type=\"button\" value=\"Email Instructor\" class=\"submit btn\">",
+                600, 700, "Email Instructor");
+        }
+        echo "</td></tr></table>";
+    }
+    
     /**
     * @desc Enumerates the pictures for a response.
     * @param $question object The question object.
