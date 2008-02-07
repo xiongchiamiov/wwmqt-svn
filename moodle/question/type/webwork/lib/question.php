@@ -216,14 +216,16 @@ class WebworkQuestion {
         }
         $answers = $tempanswers;
         
-        
+        //base64 encoding
+        for($i=0;$i<count($answers);$i++) {
+            $answers[$i]['field'] = base64_encode($answers[$i]['field']);
+            $answers[$i]['answer'] = base64_encode($answers[$i]['answer']);
+        }
         
         $client = WebworkClient::Get();
         $env = WebworkQuestion::DefaultEnvironment();
         $env->problemSeed = $seed;
-        
         $results = $client->renderProblemAndCheck($env,$this->_data->code,array(),$answers);
-        
         //process the question
         $question = $results->problem;
         $derivation = new stdClass;
@@ -291,6 +293,11 @@ class WebworkQuestion {
     protected function processAnswers(&$answers) {
         $total = 0;   
         for($i=0;$i<count($answers);$i++) {
+            $answers[$i]->field = base64_decode($answers[$i]->field);
+            $answers[$i]->answer = base64_decode($answers[$i]->answer);
+            $answers[$i]->answer_msg = base64_decode($answers[$i]->answer_msg);
+            $answers[$i]->correct = base64_decode($answers[$i]->correct);
+            $answers[$i]->evaluated = base64_decode($answers[$i]->evaluated);
             $answers[$i]->preview = base64_decode($answers[$i]->preview);
             $total += $answers[$i]->score;            
         }
