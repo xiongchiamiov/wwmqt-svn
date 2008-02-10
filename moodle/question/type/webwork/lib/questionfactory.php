@@ -189,7 +189,7 @@ class WebworkQuestionFactory {
         } else {
             $versions = 1;
         }
-        $results = $client->Problem($versions,$env,$code);
+        $results = $client->renderProblem($env,$code);
         //init error arrays
         $errorresults = array();
         $noerrorresults = array();
@@ -204,6 +204,7 @@ class WebworkQuestionFactory {
                 array_push($noerrorresults,$record);
             }
         }
+        
         //pick up derivations with warnings
         foreach($noerrorresults as $record) {
             if((isset($record->warnings)) && ($record->warnings != '') && ($record->warnings != null)) {
