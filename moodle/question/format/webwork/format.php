@@ -14,6 +14,7 @@ define('WWQUESTION_REQUEST_SIZE',1);
 
 require_once("$CFG->libdir/xmlize.php");
 require_once("$CFG->dirroot/question/type/webwork/lib/question.php");
+require_once("$CFG->dirroot/question/type/webwork/lib/questionfactory.php");
 require_once("$CFG->dirroot/mod/quiz/lib.php");
 require_once("$CFG->dirroot/mod/quiz/editlib.php");
 require_once("$CFG->dirroot/course/lib.php");
@@ -158,6 +159,7 @@ class qformat_webwork extends qformat_default {
                     $qend = time();
                     $qdiff = $qend-$qstart;
                     echo "Generated ~($qdiff secs)<br>";
+		    flush();
                     $question->webwork = $wwquestion;
                     $question->questiontext = addslashes(base64_decode($wwquestion->render(0,array(),0)));
                     $question->questiontextformat = 1;
