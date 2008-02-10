@@ -1,29 +1,22 @@
 <?php // $Id: preview.php,v 1.13.2.6 2008-01-24 15:06:46 tjhunt Exp $
 /**
-* This page displays a preview of a question
-*
-* The preview uses the option settings from the activity within which the question
-* is previewed or the default settings if no activity is specified. The question session
-* information is stored in the session as an array of subsequent states rather
-* than in the database.
-*
-* TODO: make this work with activities other than quiz
-*
-* @version $Id: preview.php,v 1.13.2.6 2008-01-24 15:06:46 tjhunt Exp $
-* @author Alex Smith as part of the Serving Mathematics project
-*         {@link http://maths.york.ac.uk/serving_maths}
-* @license http://www.gnu.org/copyleft/gpl.html GNU Public License
-* @package question
-*/
+ * The instructor preview page.
+ *
+ * @copyright &copy; 2008 Matthew Leventi
+ * @author mleventi@gmail.com
+ * @license http://www.gnu.org/copyleft/gpl.html GNU Public License
+ * @package webwork_qtype
+ **/
+ 
     require_once("../../../config.php");
     require_once($CFG->libdir.'/questionlib.php');
     require_once($CFG->dirroot.'/mod/quiz/locallib.php'); // We really want to get rid of this
 
-    $id = required_param('id', PARAM_INT);        // question id
-    $uid = required_param('uid', PARAM_INT);
-    $seed = required_param('seed', PARAM_INT);
-    // if no quiz id is specified then a dummy quiz with default options is used
-    $quizid = optional_param('quizid', 0, PARAM_INT);
+    $id = required_param('id', PARAM_INT);              // question id
+    $uid = required_param('uid', PARAM_INT);            // student user id        
+    $seed = required_param('seed', PARAM_INT);          // students seed
+    $quizid = required_param('quizid', PARAM_INT);   // quiz id
+    
     // Test if we are continuing an attempt at a question
     $continue = optional_param('continue', 0, PARAM_BOOL);
     // Check for any of the submit buttons
@@ -195,6 +188,7 @@
     }
     $number = 1;
     echo "<form method=\"post\" action=\"instructorpreview.php\">\n";
+    
     print_question($questions[$id], $curstate, $number, $quiz, $options);
     
     echo '<div class="controls" align="center">';

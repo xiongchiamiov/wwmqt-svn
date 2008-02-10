@@ -100,7 +100,6 @@ class webwork_qtype extends default_questiontype {
      * @return boolean to indicate success of failure.
      */
     function save_question_options($question) {
-        //check if we have a filepath key and and a parent id.
         if(!isset($question->id)) {
             print_error('error_question_id','qtype_webwork');
             return false;
@@ -295,14 +294,22 @@ class webwork_qtype extends default_questiontype {
         return $ret;
     }
     
+    /**
+    * @desc Prints the questions buttons.
+    * @param $question object The question object.
+    * @param $state object The state object.
+    * @param $cmoptions object The quizzes or other mods options
+    * @param $options object The questions options.
+    */
     function print_question_submit_buttons(&$question, &$state, $cmoptions, $options) {
-        global $COURSE;
+        $quizid = $cmoptions->id;
+        $courseid = $cmoptions->course;
         $seed = $state->responses['seed'];
         echo "<table><tr><td>";
         parent::print_question_submit_buttons($question,$state,$cmoptions,$options);
         echo "</td><td>";
-        if((!$options->readonly) && ($COURSE->id != 1)) {
-            echo link_to_popup_window('/question/type/webwork/emailinstructor.php?id=' . $question->id.'&amp;seed='.$seed.'&amp;courseid='.$COURSE->id, 'emailinstructor',
+        if((!$options->readonly) && ($courseid != 1)) {
+            echo link_to_popup_window('/question/type/webwork/emailinstructor.php?id=' . $question->id.'&amp;seed='.$seed.'&amp;quizid='.$quizid, 'emailinstructor',
                 "<input type=\"button\" value=\"Email Instructor\" class=\"submit btn\">",
                 600, 700, "Email Instructor");
         }

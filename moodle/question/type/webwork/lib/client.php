@@ -40,14 +40,12 @@ class WebworkClient {
     * @desc Calls the server function renderProblem.
     * @param object $env The problem environment.
     * @param string $code The base64 encoded PG code.
-    * @param array $files An array of base64 encoded file names.
     * @return mixed The results of the server call.
     */
-    public function renderProblem($env,$code,$files=array()) {
+    public function renderProblem($env,$code) {
         $problem = new stdClass;
         $problem->code = $code;
         $problem->env = $env;
-        $problem->files = $files;
         
         try {
             $results = $this->_client->renderProblem($problem);
@@ -63,15 +61,13 @@ class WebworkClient {
     * @desc Calls the server function renderProblem.
     * @param object $env The problem environment.
     * @param string $code The base64 encoded PG code.
-    * @param array $files An array of base64 encoded file names.
     * @param array $answers The array of answers.
     * @return mixed The results of the server call.
     */
-    public function renderProblemAndCheck($env,$code,$files=array(),$answers) {
+    public function renderProblemAndCheck($env,$code,$answers) {
         $problem = new stdClass;
         $problem->code = $code;
         $problem->env = $env;
-        $problem->files = $files;
         
         try {
             $response = $this->_client->renderProblemAndCheck($problem,$answers);
@@ -81,36 +77,6 @@ class WebworkClient {
         }
         return $response;
     }
-    
-    /**
-    * @desc Calls the server function generateProblem.
-    * @param integer $trials The number of trials to generate.
-    * @param object $env The problem environment.
-    * @param string $code The base64 encoded PG code.
-    * @param array $files An array of base64 encoded file names.
-    * @return mixed The results of the server call.
-    */
-    public function generateProblem($trials,$env,$code,$files=array()) {
-        $problem = array();
-        $problem['code'] = $code;
-        $problem['env'] = $env;
-        $problem['files']= $files;
-        $params = array();
-        $params['trials'] = $trials;
-        $params['problem'] = $problem;
-        $params['id'] = 0;
-        try {
-            $results = $this->_client->generateProblem($params);
-        } catch (SoapFault $exception) {
-            print_error('error_soap','qtype_webwork',$exception);
-            return false;
-        }
-        return $results; 
-    }
-    
-    
-    
-
 }
 
 ?>

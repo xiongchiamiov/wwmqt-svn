@@ -225,7 +225,7 @@ class WebworkQuestion {
         $client = WebworkClient::Get();
         $env = WebworkQuestion::DefaultEnvironment();
         $env->problemSeed = $seed;
-        $results = $client->renderProblemAndCheck($env,$this->_data->code,array(),$answers);
+        $results = $client->renderProblemAndCheck($env,$this->_data->code,$answers);
         //process the question
         $question = $results->problem;
         $derivation = new stdClass;

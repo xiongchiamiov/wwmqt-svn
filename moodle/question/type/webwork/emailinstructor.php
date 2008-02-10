@@ -1,38 +1,80 @@
 <?php // $Id: preview.php,v 1.13.2.6 2008-01-24 15:06:46 tjhunt Exp $
 /**
-* This page displays the form to send a question to the instructor.
-*
-* The preview uses the option settings from the activity within which the question
-* is previewed or the default settings if no activity is specified. The question session
-* information is stored in the session as an array of subsequent states rather
-* than in the database.
-*
-* TODO: make this work with activities other than quiz
-*
-* @version $Id: preview.php,v 1.13.2.6 2008-01-24 15:06:46 tjhunt Exp $
-* @author Alex Smith as part of the Serving Mathematics project
-*         {@link http://maths.york.ac.uk/serving_maths}
-* @license http://www.gnu.org/copyleft/gpl.html GNU Public License
-* @package question
-*/
+ * The email instructor form and page.
+ *
+ * @copyright &copy; 2008 Matthew Leventi
+ * @author mleventi@gmail.com
+ * @license http://www.gnu.org/copyleft/gpl.html GNU Public License
+ * @package webwork_qtype
+ **/
 
     require_once("../../../config.php");
     require_once($CFG->libdir.'/questionlib.php');
     require_once($CFG->libdir.'/weblib.php');
     require_once($CFG->dirroot.'/mod/quiz/locallib.php'); // We really want to get rid of this
 
-    $id = required_param('id', PARAM_INT);        // question id
+    $id = required_param('id', PARAM_INT);
     $seed = required_param('seed', PARAM_INT);
-    $courseid = required_param('courseid', PARAM_INT);
+    $quizid = required_param('quizid', PARAM_INT);
     $message = optional_param('message', '', PARAM_RAW);
     $send = optional_param('send',0,PARAM_INT);
 
     require_login();
     
+    // Load the question information
+    if (!$question = get_record('question', 'id', $id)) {
+        print_error('error_question_id','qtype_webwork');
+    }
+    
+    // Load the question type specific information
+    if (!get_question_options($question)) {
+        print_error('error_question_id_no_child','qtype_webwork');
+    }
+    
+    // Load the quiz information
+    if(!$quiz = get_record('quiz','id',$quizid)) {
+        error('Invalid Quiz ID');
+    }
+    
+    $courseid = $quiz->course;
+    
+    // Load the course information
+    if(!$course = get_record('course','id',$courseid)) {
+        error('Invalid Course ID');
+    }
+    
+    // Find where the question is in the quiz
+    $questionorder = explode(',',$quiz->questions);
+    $count = 1;
+    for($i=0;$i<$questionorder;$i++) {
+        if($questionorder[$i] != 0) {
+            if($questionorder[$i] == $id) {
+                break;
+            } else {
+                $count++;
+            }
+        }
+    }
+    $questioninquiz = $count;
+    
+    //Send the email
     if ($send) {
-        $link = $CFG->wwwroot . '/question/type/webwork/instructorpreview.php?id=' . $id . '&amp;seed=' . $seed . '&amp;uid='.$USER->id;
-        $info = "WeBWorK Problem Email<br>Problem Link: <a href='".$link."'>View Problem</a><br>";
-        $info .= "From: " . $USER->firstname . ' ' . $USER->lastname;
+        $link = $CFG->wwwroot . '/question/type/webwork/instructorpreview.php?';
+        $link .= 'id=' . $id;
+        $link .= '&amp;seed=' . $seed;
+        $link .= '&amp;uid='.$USER->id;
+        $link .= '&amp;quizid='.$quizid;
+        
+        $info =  "<h3>".get_string('wwquestion','qtype_webwork')."</h3>";
+        $info .= "<table>";
+        $info .= "<tr><td><b>Course</b></td><td>" . $course->fullname . "</td></tr>";
+        $info .= "<tr><td><b>Quiz</b></td><td>" . $quiz->name . "</td></tr>";
+        $info .= "<tr><td><b>Student</b></td><td>" . $USER->firstname . ' ' . $USER->lastname . "</td></tr>";
+        $info .= "<tr><td><b>Question #</b></td><td>". $questioninquiz . "</td></tr>";
+        $info .= "<tr><td><b>Link to Question<b></td><td><a href='".$link."'>".get_string('viewquestion','qtype_webwork')."</a></td></tr>";
+        $info .= "</table>";
+        
+        $info .= "";
         $info .= "<br><br>";
         $message = $info . $message;
         $msghtml = $message;
@@ -41,13 +83,13 @@
         $sentsomewhere = false;
         if ($users = get_users_by_capability($context, 'moodle/course:viewcoursegrades')) {
             foreach ($users as $user) {
-                if(email_to_user($user,$USER,'WeBWorK Problem',$msgtext,$msghtml,NULL,NULL,$USER->email,$USER->email,$USER->firstname . ' ' . $USER->lastname)) {
+                if(email_to_user($user,$USER,get_string('wwquestion','qtype_webwork'),$msgtext,$msghtml,NULL,NULL,$USER->email,$USER->email,$USER->firstname . ' ' . $USER->lastname)) {
                     $sentsomewhere = true;
                 }
             }
         }
         if($sentsomewhere) {
-            echo 'Email was sent<br><br>';
+            echo get_string('emailconfirm','qtype_webwork').'<br><br>';
             echo '<BUTTON onclick="window.close();">Close</BUTTON>';
             exit(1);
         } else {
@@ -55,17 +97,9 @@
         }
     }
     
-    // Load the question information
-    if (!$question = get_record('question', 'id', $id)) {
-        error('Could not load question');
-    }
     
-    // Load the question type specific information
-    if (!get_question_options($question)) {
-        error(get_string('newattemptfail', 'quiz'));
-    }
 
-    $strpreview = "Email Instructor";
+    $strpreview = get_string('emailinstructor','qtype_webwork');
     
     print_header($strpreview);
     print_heading($strpreview);
@@ -89,7 +123,7 @@
     echo "<br><br>";
     echo '<input type="hidden" name="id" value="'.$id.'"/>';
     echo '<input type="hidden" name="seed" value="'.$seed.'"/>';
-    echo '<input type="hidden" name="courseid" value="'.$courseid.'"/>';
+    echo '<input type="hidden" name="quizid" value="'.$quizid.'"/>';
     echo '<input type="hidden" name="send" value="1"/>';
     echo '<input type="submit" value="Send Email" />';
     echo "</form>";
