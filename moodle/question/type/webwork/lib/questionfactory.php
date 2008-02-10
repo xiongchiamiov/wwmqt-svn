@@ -183,12 +183,8 @@ class WebworkQuestionFactory {
     public function CodeCheck($code,$files,$codecheck) {
         $client = WebworkClient::Get();
         $env = WebworkQuestion::DefaultEnvironment();
-        if(($codecheck == WWQUESTION_CODECHECK_ERRORS_MANY) || ($codecheck == WWQUESTION_CODECHECK_ALL_MANY)) {
-            $versions = 10;
-        } else {
-            $versions = 1;
-        }
-        $results = $client->renderProblem($env,$code);
+        $results[0] = $client->renderProblem($env,$code);
+        //var_dump($results);
         //init error arrays
         $errorresults = array();
         $noerrorresults = array();
@@ -249,6 +245,7 @@ class WebworkQuestionFactory {
                 break;
         }
         if($valid) {
+            
             $result = $useableresults[0];
             $output = new stdClass;
             $output->valid = 1;
