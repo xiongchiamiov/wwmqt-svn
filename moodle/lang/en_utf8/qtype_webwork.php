@@ -12,27 +12,26 @@
 //module name
 $string['webwork'] = 'WeBWorK';
 
+$string['emailinstructor'] = 'Email Instructor';
+$string['wwquestion'] = 'WeBWorK Question';
+$string['viewquestion'] = 'View Question';
+$string['emailconfirm'] = 'WeBWorK Email was Sent';
+
 //form editing
 $string['editingwebwork'] = 'Editing WeBWorK';
 $string['edit_codeheader'] = 'WeBWorK Code';
 $string['edit_fileheader'] = 'WeBWorK Files';
 $string['edit_optionheader'] = 'WeBWorK Options';
-    $string['edit_cache'] = 'Cache';
-    $string['edit_cache0'] = 'Off';
-$string['edit_cache1'] = 'On';
 $string['edit_codecheck'] = 'Code Checking';
     $string['edit_codecheck0'] = 'Turn Off (unadvised)';
     $string['edit_codecheck1'] = 'Reject Problem Seeds w/ Errors (silent)';
     $string['edit_codecheck2'] = 'Reject Question if any Errors exist (strict)';
     $string['edit_codecheck3'] = 'Reject Problem Seeds w/ Errors or Warnings (silent)';
     $string['edit_codecheck4'] = 'Reject Question if any Errors or Warnings exist (strict)';
-$string['edit_codefile'] = 'Question File';
-$string['edit_addcodefiles'] = 'Add More Question Files';
 $string['edit_code'] = 'Code';
-$string['edit_seed'] = 'Seed';
-$string['edit_trials'] = 'Trials';
 
 //errors
+$string['error_quiz_id'] = 'No Quiz with the ID';
 $string['error_question_id'] = 'The parent question ID was not set.';
 $string['error_question_id_no_child'] = 'There is no record of a webwork question with a parent ID:';
 $string['error_no_filepath'] = 'No filepath key was found.';
