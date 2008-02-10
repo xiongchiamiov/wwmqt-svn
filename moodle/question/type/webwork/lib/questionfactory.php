@@ -153,6 +153,7 @@ class WebworkQuestionFactory {
         $importdata->codecheck = $codecheck;
         $importdata->code = $code;
         $importdata->grading = $output->grading;
+	echo "ATA";
         $wwquestion = new WebworkQuestion($importdata,$output->derivation);   
         return $wwquestion;
     }
@@ -188,7 +189,7 @@ class WebworkQuestionFactory {
         } else {
             $versions = 1;
         }
-        $results = $client->generateProblem($versions,$env,$code,$files);
+        $results = $client->Problem($versions,$env,$code);
         //init error arrays
         $errorresults = array();
         $noerrorresults = array();
