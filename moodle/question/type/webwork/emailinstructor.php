@@ -13,42 +13,46 @@
     require_once($CFG->libdir.'/weblib.php');
     require_once($CFG->dirroot.'/mod/quiz/locallib.php'); // We really want to get rid of this
 
-    $id = required_param('id', PARAM_INT);
-    $seed = required_param('seed', PARAM_INT);
-    $quizid = required_param('quizid', PARAM_INT);
+    $questionid = required_param('qid', PARAM_INT);
+    $attemptid = required_param('aid', PARAM_INT);
     $message = optional_param('message', '', PARAM_RAW);
     $send = optional_param('send',0,PARAM_INT);
-
-    require_login();
     
-    // Load the question information
-    if (!$question = get_record('question', 'id', $id)) {
-        print_error('error_question_id','qtype_webwork');
+    if (!$attempt = get_record('quiz_attempts', 'id', $attemptid)) {
+        error('No such attempt ID exists');
+    }
+    if (!$neweststateid = get_field('question_sessions', 'newest', 'attemptid', $attempt->uniqueid, 'questionid', $questionid)) {
+        // newest_state not set, probably because this is an old attempt from the old quiz module code
+        if (!$state = get_record('question_states', 'question', $questionid, 'attempt', $attempt->uniqueid)) {
+            error('Invalid question id');
+        }
+    } else {
+        if (! $state = get_record('question_states', 'id', $neweststateid)) {
+            error('Invalid state id');
+        }
     }
     
-    // Load the question type specific information
-    if (!get_question_options($question)) {
-        print_error('error_question_id_no_child','qtype_webwork');
+    if (! $question = get_record('question', 'id', $state->question)) {
+        error('Question for this state is missing');
+    }
+    if (! $quiz = get_record('quiz', 'id', $attempt->quiz)) {
+        error('Course module is incorrect');
+    }
+    if (! $course = get_record('course', 'id', $quiz->course)) {
+        error('Course is misconfigured');
+    }
+    if (! $cm = get_coursemodule_from_instance('quiz', $quiz->id, $course->id)) {
+        error('Course Module ID was incorrect');
     }
     
-    // Load the quiz information
-    if(!$quiz = get_record('quiz','id',$quizid)) {
-        error('Invalid Quiz ID');
-    }
-    
-    $courseid = $quiz->course;
-    
-    // Load the course information
-    if(!$course = get_record('course','id',$courseid)) {
-        error('Invalid Course ID');
-    }
+    require_login($course->id, false, $cm);
     
     // Find where the question is in the quiz
     $questionorder = explode(',',$quiz->questions);
     $count = 1;
     for($i=0;$i<$questionorder;$i++) {
         if($questionorder[$i] != 0) {
-            if($questionorder[$i] == $id) {
+            if($questionorder[$i] == $question->id) {
                 break;
             } else {
                 $count++;
@@ -57,13 +61,32 @@
     }
     $questioninquiz = $count;
     
+    $key = $question->id;
+    $questions[$key] = &$question;
+    if (!get_question_options($questions)) {
+        error("Unable to load questiontype specific question information");
+    }
+    
+    $session = get_record('question_sessions', 'attemptid', $attempt->uniqueid, 'questionid', $question->id);
+    $state->sumpenalty = $session->sumpenalty;
+    $state->manualcomment = $session->manualcomment;
+    restore_question_state($question, $state);
+    $state->last_graded = $state;
+    
+    $seed = $state->responses['seed'];
     //Send the email
     if ($send) {
-        $link = $CFG->wwwroot . '/question/type/webwork/instructorpreview.php?';
-        $link .= 'id=' . $id;
-        $link .= '&amp;seed=' . $seed;
-        $link .= '&amp;uid='.$USER->id;
-        $link .= '&amp;quizid='.$quizid;
+        $previewlink = $CFG->wwwroot . '/question/type/webwork/instructorpreview.php?';
+        $previewlink .= 'id=' . $questionid;
+        $previewlink .= '&amp;seed=' . $seed;
+        $previewlink .= '&amp;uid='.$USER->id;
+        $previewlink .= '&amp;quizid='.$quiz->id;
+        
+        $historylink = $CFG->wwwroot . '/mod/quiz/reviewquestion.php?';
+        $historylink .= 'attempt=' . $attemptid;
+        $historylink .= '&amp;question=' . $questionid;
+        
+        
         
         $info =  "<h3>".get_string('wwquestion','qtype_webwork')."</h3>";
         $info .= "<table>";
@@ -71,7 +94,8 @@
         $info .= "<tr><td><b>Quiz</b></td><td>" . $quiz->name . "</td></tr>";
         $info .= "<tr><td><b>Student</b></td><td>" . $USER->firstname . ' ' . $USER->lastname . "</td></tr>";
         $info .= "<tr><td><b>Question #</b></td><td>". $questioninquiz . "</td></tr>";
-        $info .= "<tr><td><b>Link to Question<b></td><td><a href='".$link."'>".get_string('viewquestion','qtype_webwork')."</a></td></tr>";
+        $info .= "<tr><td><b>Response History</b></td><td><a href='".$historylink."'>".get_string('view','qtype_webwork')."</a></td></tr>";
+        $info .= "<tr><td><b>Question Preview</b></td><td><a href='".$previewlink."'>".get_string('view','qtype_webwork')."</a></td></tr>";
         $info .= "</table>";
         
         $info .= "";
@@ -79,7 +103,7 @@
         $message = $info . $message;
         $msghtml = $message;
         $msgtext = html_to_text($message);
-        $context = get_context_instance(CONTEXT_COURSE, $courseid);
+        $context = get_context_instance(CONTEXT_COURSE, $course->id);
         $sentsomewhere = false;
         if ($users = get_users_by_capability($context, 'moodle/course:viewcoursegrades')) {
             foreach ($users as $user) {
@@ -99,20 +123,18 @@
     
     
 
+    $options = quiz_get_reviewoptions($quiz, $attempt, $context);
+    $options->validation = ($state->event == QUESTION_EVENTVALIDATE);
+    $options->readonly = true;
+    
+
     $strpreview = get_string('emailinstructor','qtype_webwork');
     
     print_header($strpreview);
     print_heading($strpreview);
-    
-    //create default state
-    $state = new stdClass;
-    $state->responses['seed'] = $seed;
-    $state->event = 0;
-    
-    $option = new stdClass;
-    $option->readonly = true;
+
     echo "<b>Question</b><br>";
-    $QTYPES['webwork']->print_question_formulation_and_controls($question,$state,NULL,$option);
+    print_question($question, $state, $number, $quiz, $options);
     
     
     echo "<br><br>\n";
@@ -121,9 +143,8 @@
     print_textarea(true,15,30,NULL,NULL,'message','');
     
     echo "<br><br>";
-    echo '<input type="hidden" name="id" value="'.$id.'"/>';
-    echo '<input type="hidden" name="seed" value="'.$seed.'"/>';
-    echo '<input type="hidden" name="quizid" value="'.$quizid.'"/>';
+    echo '<input type="hidden" name="qid" value="'.$question->id.'"/>';
+    echo '<input type="hidden" name="aid" value="'.$attemptid.'"/>';
     echo '<input type="hidden" name="send" value="1"/>';
     echo '<input type="submit" value="Send Email" />';
     echo "</form>";

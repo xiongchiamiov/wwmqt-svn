@@ -84,7 +84,9 @@ class webwork_qtype extends default_questiontype {
         try {
             $wwquestion = WebworkQuestionFactory::Retrieve($key);
             $form->webwork = $wwquestion;
-            $form->questiontext = addslashes(base64_decode($wwquestion->render(0,array(),0)));
+            $temp = array();
+            $form->questiontext = addslashes(base64_decode($wwquestion->render(0,$temp,0)));
+            
             $form->questiontextformat = FORMAT_MOODLE;
         } catch(Exception $e) {
             print_error('error_no_filepath_record','qtype_webwork');
@@ -208,6 +210,36 @@ class webwork_qtype extends default_questiontype {
         $showPartiallyCorrectAnswers = $wwquestion->getGrading();
         $qid = $wwquestion->getQuestion();
         
+        //Answer Table construction
+        if($state->event == QUESTION_EVENTGRADE) {
+            $answertable = new stdClass;
+            $answertable->head = array();
+            if($showPartiallyCorrectAnswers == 1) {
+                array_push($answertable->head,'Result');
+            }
+            array_push($answertable->head,'Answer','Preview','Evaluated','Errors');
+            $answertable->width = "100%";
+            $answertabledata = array();
+            foreach ($answers as $answer) {
+                $answertablerow = array();
+                if($showPartiallyCorrectAnswers == 1) {
+                    $firstfield = '';
+                    $firstfield .= question_get_feedback_image($answer->score);
+                    if($answer->score == 1) { 
+                        $firstfield .= "Correct"; 
+                    } else { 
+                        $firstfield .= "Incorrect"; 
+                    }
+                    array_push($answertablerow,$firstfield);
+                }
+                array_push($answertablerow,$answer->answer,$answer->preview,$answer->evaluated,$answer->answer_msg);
+                array_push($answertabledata,$answertablerow);
+            }
+            $answertable->data = $answertabledata;
+            $answertable = make_table($answertable);
+        } else {
+            $answertable = "";
+        }
         include("$CFG->dirroot/question/type/webwork/display.html");
         flush();
     }
@@ -302,14 +334,14 @@ class webwork_qtype extends default_questiontype {
     * @param $options object The questions options.
     */
     function print_question_submit_buttons(&$question, &$state, $cmoptions, $options) {
-        $quizid = $cmoptions->id;
         $courseid = $cmoptions->course;
         $seed = $state->responses['seed'];
+        $attempt = $state->attempt;
         echo "<table><tr><td>";
         parent::print_question_submit_buttons($question,$state,$cmoptions,$options);
         echo "</td><td>";
         if((!$options->readonly) && ($courseid != 1)) {
-            echo link_to_popup_window('/question/type/webwork/emailinstructor.php?id=' . $question->id.'&amp;seed='.$seed.'&amp;quizid='.$quizid, 'emailinstructor',
+            echo link_to_popup_window('/question/type/webwork/emailinstructor.php?qid=' . $question->id.'&amp;aid='.$attempt, 'emailinstructor',
                 "<input type=\"button\" value=\"Email Instructor\" class=\"submit btn\">",
                 600, 700, "Email Instructor");
         }
@@ -326,7 +358,7 @@ class webwork_qtype extends default_questiontype {
         $temp = '';
         $i = 1;
         foreach($state->responses['answers'] as $key => $value) {
-            $responses[] = "$i) " . $value->answer;
+            $responses[] = "Q$i) " . $value->answer;
             $i++;
         }
         return $responses;
@@ -345,7 +377,7 @@ class webwork_qtype extends default_questiontype {
             $responses = array();
         }
         if (is_array($responses)) {
-            $responses = implode('<br/><br/>', $responses);
+            $responses = implode(' ', $responses);
         }
         return $responses;
     }

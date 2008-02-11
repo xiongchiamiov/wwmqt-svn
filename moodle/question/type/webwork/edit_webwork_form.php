@@ -111,20 +111,10 @@ class question_edit_webwork_form extends question_edit_form {
         $mform->setType('code', PARAM_RAW);
         $mform->setHelpButton('code', array('code', get_string('edit_code', 'qtype_webwork'), 'webwork'));
         
-        //OPTIONS HEADER
-        $mform->addElement('header', 'optionheader', get_string("edit_optionheader","qtype_webwork"));
-        
-        //CODECHECK
-        $codecheckoptions = array(
-            WWQUESTION_CODECHECK_OFF            => get_string('edit_codecheck0','qtype_webwork'),
-            WWQUESTION_CODECHECK_ERRORS         => get_string('edit_codecheck1','qtype_webwork'),
-            WWQUESTION_CODECHECK_ALL            => get_string('edit_codecheck2','qtype_webwork'),
-            WWQUESTION_CODECHECK_ERRORS_MANY    => get_string('edit_codecheck3','qtype_webwork'),
-            WWQUESTION_CODECHECK_ALL_MANY       => get_string('edit_codecheck4','qtype_webwork'));
-        $mform->addElement('select','codecheck', get_string('edit_codecheck', 'qtype_webwork'),$codecheckoptions);
-        $mform->setType('codecheck',PARAM_INT);
-        $mform->setHelpButton('codecheck', array('codecheck', get_string('edit_codecheck', 'qtype_webwork'), 'webwork'));
-        $mform->setDefault('codecheck',WWQUESTION_CODECHECK_ALL);
+        //CODECHECK (legacy dont want to change db so this stays till 1.9)
+        $mform->addElement('hidden','codecheck');
+        $mform->setType('codecheck', PARAM_INT);
+        $mform->setDefault('codecheck', 1);
         
         //STOREKEY
         $mform->addElement('hidden', 'storekey');
@@ -155,8 +145,8 @@ class question_edit_webwork_form extends question_edit_form {
         $errors = array();
         //build dataobject
         $dataobject = new stdClass;
-        $dataobject->codecheck = $data['codecheck'];
         $dataobject->code = $data['code'];
+        $dataobject->codecheck = $data['codecheck'];
         
         //attempt to find an ID (if updating)
         if(isset($this->question->webwork)) {

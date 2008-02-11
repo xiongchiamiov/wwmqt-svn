@@ -12,16 +12,6 @@ require_once("$CFG->dirroot/question/type/webwork/config.php");
 require_once("$CFG->dirroot/question/type/webwork/lib/client.php");
 require_once("$CFG->dirroot/question/type/webwork/lib/htmlparser.php");
 
-
-/**
-* @desc Defines the different states a question can be created under. Used to determine if we should create directories etc.
-*/
-define('WWQUESTION_CODECHECK_OFF',          0);
-define('WWQUESTION_CODECHECK_ERRORS',       1);
-define('WWQUESTION_CODECHECK_ALL',          2);
-define('WWQUESTION_CODECHECK_ERRORS_MANY',  3);
-define('WWQUESTION_CODECHECK_ALL_MANY',     4);
-
 /**
 * @desc The WeBWorKQuestion class
 */
@@ -96,7 +86,9 @@ class WebworkQuestion {
     * @param object $event The event object.
     * @return string The HTML question representation.
     */
-    public function render($seed,$answers,$event) {
+    public function render($seed,&$answers,$event) {
+        //JIT Derivation creation
+        //Usually we have this from the check answers call
         if(!isset($this->_derivation)) {
             $client = WebworkClient::Get();
             $env = WebworkQuestion::DefaultEnvironment();
@@ -108,11 +100,12 @@ class WebworkQuestion {
             $this->_derivation = $derivation;
         }
         
-        $newanswers = array();
+        $orderedanswers = array();
+        $tempanswers = array();
         foreach($answers as $answer) {
-            $newanswers[$answer->field] = $answer;
+            $tempanswers[$answer->field] = $answer;
         }
-        $answers = $newanswers;
+        $answers = $tempanswers;
         
         $showpartialanswers = $this->_data->grading;
         $questionhtml = "";
@@ -140,34 +133,38 @@ class WebworkQuestion {
                             $parser->iNodeAttributes['class'] = $class . ' ' . question_get_feedback_class($answers[$name]->score);
                         }
                     }
-                    if((!strstr($name,'previous')) && (isset($answers[$name]))) {
-                        
-                    }
                 }
                 //handle specific change
                 if($nodename == "INPUT") {
                     $nodetype = strtoupper($parser->iNodeAttributes['type']);
                     if($nodetype == "CHECKBOX") {
                         if(strstr($answers[$name]->answer,$parser->iNodeAttributes['value'])) {
+                            //FILLING IN ANSWER (CHECKBOX)
+                            array_push($orderedanswers,$answers[$name]);
                             $parser->iNodeAttributes['checked'] = '1';
                         }
                         $parser->iNodeAttributes['name'] = $parser->iNodeAttributes['name'] . '_' . $parser->iNodeAttributes['value'];                      
-                    } else {
-                        //put submitted value into field
+                    } else if($nodetype == "TEXT") {
                         if(isset($answers[$name])) {
+                            //FILLING IN ANSWER (FIELD)
+                            array_push($orderedanswers,$answers[$name]);
                             $parser->iNodeAttributes['value'] = $answers[$name]->answer;
                         }
                     }
                 } else if($nodename == "SELECT") {
                     $currentselect = $name;    
                 } else if($nodename == "OPTION") {
-                    if($parser->iNodeAttributes['value'] == $answers[$currentselect]->answer)
+                    if($parser->iNodeAttributes['value'] == $answers[$currentselect]->answer) {
+                        //FILLING IN ANSWER (DROPDOWN)
+                        array_push($orderedanswers,$answers[$currentselect]);
                         $parser->iNodeAttributes['selected'] = '1';
+                    }
                 } else if($nodename == "TEXTAREA") {
                 }
             }
             $questionhtml .= $parser->printTag();
         }
+        $answers = $orderedanswers;
         return $questionhtml;
     }
     

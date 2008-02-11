@@ -144,13 +144,12 @@ class WebworkQuestionFactory {
     /**
     * @desc Creates a WebworkQuestion from data given by the importer.
     * @param string $code The PG code.
-    * @param string $codecheck The codecheck level.
     * @return WebworkQuestion object.
     */
-    public static function Import($code,$codecheck) {
-        $output = WebworkQuestionFactory::CodeCheck($code,array(),$codecheck);
+    public static function Import($code) {
+        $output = WebworkQuestionFactory::CodeCheck($code);
         $importdata = new stdClass;
-        $importdata->codecheck = $codecheck;
+        $importdata->codecheck = 1;
         $importdata->code = $code;
         $importdata->grading = $output->grading;
         $wwquestion = new WebworkQuestion($importdata,$output->derivation);   
@@ -164,7 +163,7 @@ class WebworkQuestionFactory {
     
     public static function CreateFromForm($formdata) {
         WebworkQuestionFactory::ParseFormData($formdata);
-        $output = WebworkQuestionFactory::CodeCheck($formdata->code,array(),$formdata->codecheck);
+        $output = WebworkQuestionFactory::CodeCheck($formdata->code);
         $formdata->grading = $output->grading;
         $wwquestion = new WebworkQuestion($formdata,$output->derivation);
         return $wwquestion;
@@ -180,75 +179,31 @@ class WebworkQuestionFactory {
         return true;
     }
     
-    public function CodeCheck($code,$files,$codecheck) {
+    /**
+    * @desc Checks if PG code is acceptable.
+    * @param string $code The PG Code.
+    * @throws Exception If there is an error with the PG code.
+    * @return object Information on the question.
+    */
+    public function CodeCheck($code) {
+        $haserrors = false;
+        $haswarnings = false;
         $client = WebworkClient::Get();
         $env = WebworkQuestion::DefaultEnvironment();
-        $results[0] = $client->renderProblem($env,$code);
-        //var_dump($results);
-        //init error arrays
-        $errorresults = array();
-        $noerrorresults = array();
-        $warningresults = array();
-        $goodresults = array();
-    
-        //pick up derivations with errors
-        foreach($results as $record) {
-            if((isset($record->errors)) && ($record->errors != '') && ($record->errors != null)) {
-                array_push($errorresults,$record);
-            } else {
-                array_push($noerrorresults,$record);
-            }
+        $result = $client->renderProblem($env,$code);
+        
+        if((isset($result->errors)) && ($result->errors != '') && ($result->errors != null)) {
+            $haserrors = true;
         }
         
-        //pick up derivations with warnings
-        foreach($noerrorresults as $record) {
-            if((isset($record->warnings)) && ($record->warnings != '') && ($record->warnings != null)) {
-                array_push($warningresults,$record);
-            } else {
-                array_push($goodresults,$record);
-            }
+        if((isset($result->warnings)) && ($result->warnings != '') && ($result->warnings != null)) {
+            $haswarnings = true;
         }
-        $valid = false;
-        switch($codecheck) {
-            //No code check
-            case 0:
-                $useableresults = $results;
-                $valid = true;
-                break;
-            //reject seeds with errors
-            case 1:
-                if(count($noerrorresults) > 0) {
-                    $useableresults = $noerrorresults;
-                    $valid = true;
-                }
-                break;
-            //reject if errors
-            case 2:
-                if(count($noerrorresults) == count($results)) {
-                    $useableresults = $results;
-                    $valid = true;
-                }
-                break;
-            //reject seeds with errors or warnings
-            case 3:
-                if(count($goodresults) > 0) {
-                    $useableresults = $goodresults;
-                    $valid = true;
-                }
-                break;
-            //reject if errors or warnings
-            case 4:
-                if(count($goodresults) == count($results)) {
-                    $useableresults = $goodresults;
-                    $valid = true;
-                }
-                break;
-        }
-        if($valid) {
+        
+        //Validity Check
+        if(($haserrors == false) && ($haswarnings == false)) {
             
-            $result = $useableresults[0];
             $output = new stdClass;
-            $output->valid = 1;
             $output->grading = $result->grading;
             
             $derivation = new stdClass;
@@ -256,75 +211,17 @@ class WebworkQuestionFactory {
             $derivation->seed = $result->seed;
             $output->derivation = $derivation;
         } else {
-            //NOW WE ARE INVALID going to throwup
-            //start the output
-            $errormsgs = array();
-            $warningmsgs = array();
-            //ERRORS
-            foreach($errorresults as $record) {
-                $found = 0;
-                $candidate = $record->errors . "<br>";
-                $candidateseed = $record->seed;
-                for($i=0;$i<count($errormsgs);$i++) {
-                    if($candidate == $errormsgs[$i]->errors) {
-                        $found = 1;
-                        $errormsgs[$i]->seeds[] = $candidateseed;
-                    }
-                }
-                if($found == 0) {
-                    //new error message
-                    $msg = new stdClass;
-                    $msg->errors = $candidate;
-                    $msg->seeds = array();
-                    $msg->seeds[] = $candidateseed;
-                    $errormsgs[] = $msg;
-                }
+            //NOW WE ARE INVALID going to throw
+            $msg = "<h2>PG Code Problems</h2>";
+            if($haserrors) {
+                $msg .= "<h3>Errors</h3>";
+                $msg .= $result->errors;
             }
-            //WARNINGS
-            foreach($warningresults as $record) {
-                $found = 0;
-                $candidate = $record->warnings . "<br>";
-                $candidateseed = $record->seed;
-                for($i=0;$i<count($warningmsgs);$i++) {
-                    if((isset($warningmsgs[$i]->errors))&&($candidate == $warningmsgs[$i]->errors)) {
-                        $found = 1;
-                        $warningmsgs[$i]->seeds[] = $candidateseed;
-                    }
-                }
-                if($found == 0) {
-                    //new error message
-                    $msg = new stdClass;
-                    $msg->warnings = $candidate;
-                    $msg->seeds = array();
-                    $msg->seeds[] = $candidateseed;
-                    $warningmsgs[] = $msg;
-                }
-                
+            if($haswarnings) {
+                $msg .= "<h3>Warnings</h3>";
+                $msg .= $result->warnings;
             }
-            $finalmsg = "Errors in PG Code on: " . count($errorresults) . " out of " . count($results) . " seeds tried:<br>";
-            //construct error statement
-            $counter = 1;
-            foreach($errormsgs as $msg) {
-                $finalmsg .= "$counter) ";
-                $finalmsg .= "Seeds (";
-                foreach ($msg->seeds as $seed) {
-                    $finalmsg .= $seed . " ";
-                }
-                $finalmsg .= ") gave Errors:" . $msg->errors . "<br><br>";
-                $counter++;
-            }
-            $finalmsg .= "Warnings in PG Code on: " . count($warningresults) . " out of " . count($results) . " seeds tried:<br>";
-            $counter = 1;
-            foreach($warningmsgs as $msg) {
-                $finalmsg .= "$counter) ";
-                $finalmsg .= "Seeds (";
-                foreach ($msg->seeds as $seed) {
-                    $finalmsg .= $seed . " ";
-                }
-                $finalmsg .= ") gave Warnings:" . $msg->warnings . "<br><br>";
-                $counter++;
-            }
-            throw new Exception($finalmsg);
+            throw new Exception($msg);
         }
         return $output;   
     }
