@@ -8,13 +8,8 @@
  * @package webwork_qtype
 **/
 
-
-define('WWQUESTION_OPTIONS_FILE','OPTIONS.conf');
-define('WWQUESTION_REQUEST_SIZE',1);
-
 require_once("$CFG->libdir/xmlize.php");
 require_once("$CFG->dirroot/question/type/webwork/lib/question.php");
-require_once("$CFG->dirroot/question/type/webwork/lib/questionfactory.php");
 require_once("$CFG->dirroot/mod/quiz/lib.php");
 require_once("$CFG->dirroot/mod/quiz/editlib.php");
 require_once("$CFG->dirroot/course/lib.php");
@@ -143,7 +138,7 @@ class qformat_webwork extends qformat_default {
                 flush();
                 $qstart = time();
                 try {
-                    $wwquestion = WebworkQuestionFactory::Import($question->code,$question->codecheck);
+                    $wwquestion = WebworkQuestionFactory::Import($question->code);
                     if(isset($currentcategoryid)) {
                         $previousid = get_field('question','id','category',$currentcategoryid,'name',$question->name);
                         if($previousid) {
@@ -159,7 +154,6 @@ class qformat_webwork extends qformat_default {
                     $qend = time();
                     $qdiff = $qend-$qstart;
                     echo "Generated ~($qdiff secs)<br>";
-		    flush();
                     $question->webwork = $wwquestion;
                     $question->questiontext = addslashes(base64_decode($wwquestion->render(0,array(),0)));
                     $question->questiontextformat = 1;
