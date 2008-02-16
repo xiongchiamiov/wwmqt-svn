@@ -111,7 +111,7 @@ class WebworkQuestion {
         $questionhtml = "";
         $parser = new HtmlParser($this->_derivation->html);
         $currentselect = "";
-        
+        $textarea = false;
         $checkboxes = array();
         while($parser->parse()) {
             //change some attributes of html tags for moodle compliance
@@ -160,9 +160,19 @@ class WebworkQuestion {
                         $parser->iNodeAttributes['selected'] = '1';
                     }
                 } else if($nodename == "TEXTAREA") {
+                    if(isset($answers[$name])) {
+                        array_push($orderedanswers,$answers[$name]);
+                        $textarea = true;
+                        $questionhtml .= $parser->printTag();
+                        $questionhtml .= $answers[$name]->answer;
+                    }
                 }
             }
-            $questionhtml .= $parser->printTag();
+            if(!$textarea) {
+                $questionhtml .= $parser->printTag();
+            } else {
+                $textarea = false;
+            }
         }
         $answers = $orderedanswers;
         return $questionhtml;

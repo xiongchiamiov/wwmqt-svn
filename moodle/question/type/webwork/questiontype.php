@@ -49,7 +49,7 @@ class webwork_qtype extends default_questiontype {
      * @return boolean to indicate success of failure.
      */
     function get_question_options(&$question) {
-        //check if we have a question id.
+        //check if we have a question id.s
         if(!isset($question->id)) {
             print_error('error_question_id','qtype_webwork');
             return false;
