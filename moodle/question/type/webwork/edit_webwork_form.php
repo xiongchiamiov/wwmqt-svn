@@ -40,9 +40,41 @@ class question_edit_webwork_form extends question_edit_form {
         $mform->addElement('header', 'generalheader', get_string("general", 'form'));
         
         //Question Category
-        $mform->addElement('questioncategory', 'category', get_string('category', 'quiz'), null,
-                array('courseid' => $COURSE->id, 'published' => true, 'only_editable' => true));
-                
+        if (!isset($this->question->id)){
+            //adding question
+            $mform->addElement('questioncategory', 'category', get_string('category', 'quiz'),
+                    array('contexts' => $this->contexts->having_cap('moodle/question:add')));
+        } elseif (!($this->question->formoptions->canmove || $this->question->formoptions->cansaveasnew)){
+            //editing question with no permission to move from category.
+            $mform->addElement('questioncategory', 'category', get_string('category', 'quiz'),
+                    array('contexts' => array($this->categorycontext)));
+        } elseif ($this->question->formoptions->movecontext){
+            //moving question to another context.
+            $mform->addElement('questioncategory', 'categorymoveto', get_string('category', 'quiz'),
+                    array('contexts' => $this->contexts->having_cap('moodle/question:add')));
+
+        } else {
+            //editing question with permission to move from category or save as new q
+            $currentgrp = array();
+            $currentgrp[0] =& $mform->createElement('questioncategory', 'category', get_string('categorycurrent', 'question'),
+                    array('contexts' => array($this->categorycontext)));
+            if ($this->question->formoptions->canedit || $this->question->formoptions->cansaveasnew){
+                //not move only form
+                $currentgrp[1] =& $mform->createElement('checkbox', 'usecurrentcat', '', get_string('categorycurrentuse', 'question'));
+                $mform->setDefault('usecurrentcat', 1);
+            }
+            $currentgrp[0]->freeze();
+            $currentgrp[0]->setPersistantFreeze(false);
+            $mform->addGroup($currentgrp, 'currentgrp', get_string('categorycurrent', 'question'), null, false);
+
+            $mform->addElement('questioncategory', 'categorymoveto', get_string('categorymoveto', 'question'),
+                    array('contexts' => array($this->categorycontext)));
+            if ($this->question->formoptions->canedit || $this->question->formoptions->cansaveasnew){
+                //not move only form
+                $mform->disabledIf('categorymoveto', 'usecurrentcat', 'checked');
+            }
+        }
+               
         //Question Name
         $mform->addElement('text', 'name', get_string('questionname', 'quiz'),
                 array('size' => 50));
@@ -85,6 +117,21 @@ class question_edit_webwork_form extends question_edit_form {
 
         $mform->addElement('hidden', 'versioning');
         $mform->setType('versioning', PARAM_BOOL);
+
+        $mform->addElement('hidden', 'movecontext');
+        $mform->setType('movecontext', PARAM_BOOL);
+
+        $mform->addElement('hidden', 'cmid');
+        $mform->setType('cmid', PARAM_INT);
+        $mform->setDefault('cmid', 0);
+
+        $mform->addElement('hidden', 'courseid');
+        $mform->setType('courseid', PARAM_INT);
+        $mform->setDefault('courseid', 0);
+
+        $mform->addElement('hidden', 'returnurl');
+        $mform->setType('returnurl', PARAM_LOCALURL);
+        $mform->setDefault('returnurl', 0);
 
         $buttonarray = array();
         $buttonarray[] = &$mform->createElement('submit', 'submitbutton', get_string('savechanges'));
